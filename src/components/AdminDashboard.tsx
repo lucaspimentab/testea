@@ -476,7 +476,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           <div className="flex items-start justify-between mb-4">
             <div>
               <div className="text-purple-100 text-sm mb-1">Perguntas</div>
-              <div className="text-3xl mb-1">{perguntas.length}</div>
+              <div className="text-3xl mb-1">{perguntasPendentes.length}</div>
               <div className="text-purple-100 text-sm">
                 Aguardando resposta
               </div>
@@ -540,7 +540,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              Responder Perguntas {perguntas.length > 0 && `(${perguntas.length})`}
+              Responder Perguntas {perguntasPendentes.length > 0 && `(${perguntasPendentes.length})`}
             </button>
           </nav>
         </div>
@@ -952,12 +952,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <p className="text-gray-900 mb-2">
                             {pergunta.mensagem || pergunta.pergunta}
                           </p>
-                          <div className="flex items-center gap-3 text-sm text-gray-500">
-                            <span>{pergunta.nome || pergunta.nomeUsuario || 'Usuário'}</span>
-                            <span>•</span>
-                            <span>{new Date(pergunta.criadoEm).toLocaleDateString('pt-BR')}</span>
-                          </div>
+                        <div className="flex items-center gap-3 text-sm text-gray-500">
+                          <span>{pergunta.nome || pergunta.nomeUsuario || 'Usuário'}</span>
+                          <span>•</span>
+                          <span>{new Date(pergunta.criadoEm || pergunta.createdAt || Date.now()).toLocaleDateString('pt-BR')}</span>
                         </div>
+                      </div>
 
                         <div className="mb-4">
                           <label className="block text-gray-700 mb-2 text-sm">Sua Resposta</label>
@@ -1004,13 +1004,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           <div className="text-sm text-gray-600 flex items-center gap-2">
                             <span>{pergunta.nome || pergunta.nomeUsuario || 'Usuário'}</span>
                             <span>•</span>
-                            <span>{new Date(pergunta.criadoEm).toLocaleDateString('pt-BR')}</span>
+                            <span>{new Date(pergunta.criadoEm || pergunta.createdAt || Date.now()).toLocaleDateString('pt-BR')}</span>
                           </div>
                           <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full">Respondida</span>
                         </div>
-                        <p className="text-gray-900 mb-2 font-medium">{pergunta.mensagem || pergunta.pergunta}</p>
+                        <p className="text-gray-900 mb-2 font-medium">{pergunta.mensagem || pergunta.pergunta || 'Pergunta'}</p>
                         <p className="text-gray-700 text-sm">
-                          <span className="font-semibold">Resposta:</span> {pergunta.resposta}
+                          <span className="font-semibold">Resposta:</span> {pergunta.resposta || '—'}
                         </p>
                       </div>
                     ))}
