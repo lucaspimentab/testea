@@ -1,0 +1,11 @@
+node_modules/
+build/
+.env
+.env.*
+dist/
+supabase/.branches
+supabase/.temp
+*.log
+.DS_Store
+Thumbs.db
+
