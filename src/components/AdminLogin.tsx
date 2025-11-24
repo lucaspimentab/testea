@@ -34,7 +34,7 @@ const neighborhoodsByRegion: Record<string, string[]> = {
 };
 
 // Mesmas opções da SearchPage
-const hoursOptions = ['Manhã (6h-12h)', 'Tarde (12h-18h)', 'Noite (18h-22h)'];
+const hoursOptions = ['Manhã', 'Tarde', 'Noite'];
 const areasOptions = [
   'Assistência Social',
   'Animais',

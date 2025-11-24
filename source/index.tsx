@@ -30,6 +30,28 @@ const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.
 const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '');
 // Initialize storage bucket on startup
 const BUCKET_NAME = 'make-7a062fc7-documents';
+type HourPeriod = 'manha' | 'tarde' | 'noite';
+
+const normalizeHourPeriods = (value: unknown): HourPeriod[] => {
+  const parts = Array.isArray(value)
+    ? value
+    : String(value ?? '')
+        .split(',')
+        .map((v)=>v.trim())
+        .filter(Boolean);
+
+  const normalized = new Set<HourPeriod>();
+  const pushIf = (match: boolean, val: HourPeriod)=>match && normalized.add(val);
+
+  parts.forEach((raw)=>{
+    const clean = String(raw).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    pushIf(clean.includes('manha') || /6h|7h|8h|9h|10h|11h|12h/.test(clean), 'manha');
+    pushIf(clean.includes('tarde') || /12h|13h|14h|15h|16h|17h/.test(clean), 'tarde');
+    pushIf(clean.includes('noite') || /18h|19h|20h|21h|22h|23h/.test(clean), 'noite');
+  });
+
+  return Array.from(normalized);
+};
 (async ()=>{
   const { data: buckets } = await supabaseAdmin.storage.listBuckets();
   const bucketExists = buckets?.some((bucket)=>bucket.name === BUCKET_NAME);
@@ -256,6 +278,7 @@ app.post("/make-server-7a062fc7/signup", async (c)=>{
     }
     // Create ONG
     const ongId = crypto.randomUUID();
+    const normalizedHours = normalizeHourPeriods(horarios);
     const newOng = {
       id: ongId,
       nome: ongNome,
@@ -268,7 +291,7 @@ app.post("/make-server-7a062fc7/signup", async (c)=>{
       bairro: bairro || '',
       regiao: regiao || '',
       site: site || '',
-      horarios: horarios || [],
+      horarios: normalizedHours,
       areasAtuacao: areasAtuacao || [],
       idiomas: idiomas || [],
       caracteristicas: caracteristicas || [],
@@ -387,7 +410,11 @@ app.get("/make-server-7a062fc7/ongs", async (c)=>{
       filtered = filtered.filter((ong)=>ong.idiomas?.includes(idioma));
     }
     if (horario) {
-      filtered = filtered.filter((ong)=>ong.horarios?.includes(horario));
+      const queryHours = normalizeHourPeriods(horario);
+      filtered = filtered.filter((ong)=>{
+        const stored = normalizeHourPeriods(ong.horarios);
+        return queryHours.length ? queryHours.some((h)=>stored.includes(h)) : true;
+      });
     }
     if (busca) {
       const searchTerm = busca.toLowerCase();
@@ -434,9 +461,14 @@ app.post("/make-server-7a062fc7/ongs", async (c)=>{
   try {
     const body = await c.req.json();
     const id = crypto.randomUUID();
+    const normalizedHorarios = normalizeHourPeriods((body as any)?.horarios);
+    const sanitizedBody = {
+      ...body,
+      horarios: normalizedHorarios
+    };
     const ong = {
       id,
-      ...body,
+      ...sanitizedBody,
       criadoEm: new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
       criadoPor: authResult.user.id

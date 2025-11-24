@@ -14,11 +14,14 @@ interface Ong {
   region: string;
   neighborhood: string;
   hours: string;
+  hourPeriods?: ('manha' | 'tarde' | 'noite')[];
   categoryColor: string;
   languages: string[];
   hasAccessibility: boolean;
   hasRemoteService: boolean;
 }
+
+type HourPeriod = 'manha' | 'tarde' | 'noite';
 
 const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-7a062fc7`;
 
@@ -35,7 +38,44 @@ const categoryColorMap: Record<string, string> = {
   'Outro': 'bg-gray-500',
 };
 
-const allOngs: Ong[] = [
+const normalizeHourPeriods = (value: string | string[] | undefined | null): HourPeriod[] => {
+  const parts = Array.isArray(value)
+    ? value
+    : (value || '')
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+  const periods = new Set<HourPeriod>();
+  parts.forEach((raw) => {
+    const clean = raw
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    if (clean.includes('manha') || /6h|7h|8h|9h|10h|11h|12h/.test(clean)) {
+      periods.add('manha');
+    }
+    if (clean.includes('tarde') || /12h|13h|14h|15h|16h|17h/.test(clean)) {
+      periods.add('tarde');
+    }
+    if (clean.includes('noite') || /18h|19h|20h|21h|22h|23h/.test(clean)) {
+      periods.add('noite');
+    }
+  });
+  return Array.from(periods);
+};
+
+const formatHourLabel = (periods: HourPeriod[], fallback: string) => {
+  if (!periods.length) return fallback;
+  const label: Record<HourPeriod, string> = {
+    manha: 'Manhã',
+    tarde: 'Tarde',
+    noite: 'Noite',
+  };
+  return periods.map((p) => label[p]).join(', ');
+};
+
+const allOngsBase: Omit<Ong, 'hourPeriods'>[] = [
   {
     id: 101,
     name: "Instituto Ação Solidária",
@@ -1452,6 +1492,15 @@ const allOngs: Ong[] = [
   }
 ];
 
+const allOngs: Ong[] = allOngsBase.map((ong) => {
+  const hourPeriods = normalizeHourPeriods(ong.hours);
+  return {
+    ...ong,
+    hourPeriods,
+    hours: formatHourLabel(hourPeriods, ong.hours),
+  };
+});
+
 export function SearchPage() {
   const [view, setView] = useState<'list' | 'map'>('list');
   const [searchTerm, setSearchTerm] = useState('');
@@ -1459,7 +1508,7 @@ export function SearchPage() {
   const [selectedNeighborhood, setSelectedNeighborhood] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('');
-  const [selectedHours, setSelectedHours] = useState('');
+  const [selectedHours, setSelectedHours] = useState<'manha' | 'tarde' | 'noite' | ''>('');
   const [accessibilityFilter, setAccessibilityFilter] = useState<'all' | 'accessibility' | 'remote'>('all');
   const [selectedOng, setSelectedOng] = useState<Ong | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -1481,23 +1530,32 @@ export function SearchPage() {
         if (!resp.ok) throw new Error('Falha ao buscar ONGs');
         const { ongs: apiOngs } = await resp.json();
         if (Array.isArray(apiOngs) && apiOngs.length) {
-          const mapped: Ong[] = apiOngs.map((ong: any, idx: number) => ({
-            id: String(ong.id ?? idx),
-            name: ong.nome ?? 'ONG',
-            description: ong.descricao ?? '',
-            category: ong.areasAtuacao?.[0] ?? 'Assistência Social',
-            location: [ong.endereco, ong.numero].filter(Boolean).join(', '),
-            region: ong.regiao ?? '',
-    neighborhood: ong.bairro ?? '',
-    hours: Array.isArray(ong.horarios) ? ong.horarios.join(', ') : (ong.horarios ?? ''),
-    categoryColor: categoryColorMap[ong.areasAtuacao?.[0]] ?? 'bg-teal-500',
-    languages: ong.idiomas ?? [],
-    hasAccessibility: Array.isArray(ong.caracteristicas) && ong.caracteristicas.includes('Acessibilidade'),
-    hasRemoteService: Array.isArray(ong.caracteristicas) && ong.caracteristicas.includes('Atendimento remoto'),
-  }));
+          const mapped: Ong[] = apiOngs.map((ong: any, idx: number) => {
+            const hourPeriods = normalizeHourPeriods(ong.horarios || ong.horario || ong.horas);
+            const hoursLabel = formatHourLabel(
+              hourPeriods,
+              Array.isArray(ong.horarios) ? ong.horarios.join(', ') : (ong.horarios ?? '')
+            );
+            return {
+              id: String(ong.id ?? idx),
+              name: ong.nome ?? 'ONG',
+              description: ong.descricao ?? '',
+              category: ong.areasAtuacao?.[0] ?? 'Assistência Social',
+              location: [ong.endereco, ong.numero].filter(Boolean).join(', '),
+              region: ong.regiao ?? '',
+              neighborhood: ong.bairro ?? '',
+              hours: hoursLabel,
+              hourPeriods,
+              categoryColor: categoryColorMap[ong.areasAtuacao?.[0]] ?? 'bg-teal-500',
+              languages: ong.idiomas ?? [],
+              hasAccessibility: Array.isArray(ong.caracteristicas) && ong.caracteristicas.includes('Acessibilidade'),
+              hasRemoteService: Array.isArray(ong.caracteristicas) && ong.caracteristicas.includes('Atendimento remoto'),
+            };
+          });
           setOngs(mapped);
           return;
         }
+
       } catch (err) {
         console.error('Erro ao carregar ONGs do backend:', err);
         toast.error('Erro ao carregar ONGs do backend, mostrando lista padrão.');
@@ -1575,134 +1633,10 @@ export function SearchPage() {
 
       // Filtro de horário
       if (selectedHours) {
-        const hours = ong.hours.toLowerCase();
-        if (selectedHours === 'Manhã (6h-12h)') {
-          if (!hours.includes('6h') && !hours.includes('7h') && !hours.includes('8h') && 
-              !hours.includes('9h') && !hours.includes('10h')) {
-            return false;
-          }
-        } else if (selectedHours === 'Tarde (12h-18h)') {
-          if (!hours.includes('12h') && !hours.includes('13h') && !hours.includes('14h') && 
-              !hours.includes('15h') && !hours.includes('16h') && !hours.includes('17h')) {
-            return false;
-          }
-        } else if (selectedHours === 'Noite (18h-22h)') {
-          if (!hours.includes('18h') && !hours.includes('19h') && !hours.includes('20h') && !hours.includes('21h')) {
-            return false;
-          }
-        }
-      }
-
-      // Filtro de acessibilidade
-      if (accessibilityFilter === 'accessibility' && !ong.hasAccessibility) {
-        return false;
-      }
-      if (accessibilityFilter === 'remote' && !ong.hasRemoteService) {
-        return false;
-      }
-
-      return true;
-    });
-  };
-
-  const filteredOngs = filterOngs();
-
-  // Paginação
-  const totalPages = Math.ceil(filteredOngs.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentOngs = filteredOngs.slice(startIndex, endIndex);
-
-  const handleClearFilters = () => {
-    // Verificar quais filtros estavam ativos
-    const activeFilters = [];
-    if (searchTerm) activeFilters.push('Palavra-chave');
-    if (selectedRegion) activeFilters.push('Região');
-    if (selectedNeighborhood) activeFilters.push('Bairro');
-    if (selectedCategory) activeFilters.push('Área de Atuação');
-    if (selectedLanguage) activeFilters.push('Idioma');
-    if (selectedHours) activeFilters.push('Horário');
-    if (accessibilityFilter !== 'all') activeFilters.push('Acessibilidade');
-
-    setSearchTerm('');
-    setSelectedRegion('');
-    setSelectedNeighborhood('');
-    setSelectedCategory('');
-    setSelectedLanguage('');
-    setSelectedHours('');
-    setAccessibilityFilter('all');
-    setHasSearched(false);
-    setCurrentPage(1);
-    
-    // Mostrar mensagem grande
-    setBigMessageType('info');
-    setBigMessageText('🧹 Tudo limpo! Todos os filtros foram removidos.');
-    setShowBigMessage(true);
-    
-    // Esconder após 3 segundos
-    setTimeout(() => {
-      setShowBigMessage(false);
-    }, 3000);
-    
-    if (activeFilters.length > 0) {
-      toast.success(`Filtros removidos: ${activeFilters.join(', ')}`);
-    } else {
-      toast.info('Nenhum filtro estava ativo');
-    }
-  };
-
-  // Verificar se há filtros ativos
-  const hasActiveFilters = searchTerm || selectedRegion || selectedNeighborhood || 
-                          selectedCategory || selectedLanguage || selectedHours || 
-                          accessibilityFilter !== 'all';
-
-  const handleSearch = () => {
-    // Verificar se há filtros ativos
-    const hasFilters = searchTerm || selectedRegion || selectedNeighborhood || 
-                       selectedCategory || selectedLanguage || selectedHours || 
-                       accessibilityFilter !== 'all';
-    
-    if (!hasFilters) {
-      // Mostrar mensagem grande pedindo para aplicar filtros
-      setBigMessageType('warning');
-      setBigMessageText('⚠️ Selecione pelo menos um filtro para buscar ONGs!');
-      setShowBigMessage(true);
-      
-      // Esconder após 3 segundos
-      setTimeout(() => {
-        setShowBigMessage(false);
-      }, 3000);
-      
-      toast.info('Selecione pelo menos um filtro para buscar');
-      return;
-    }
-    
-    setHasSearched(true);
-    setCurrentPage(1);
-    
-    // Calcular quantas ONGs serão encontradas
-    const source = ongs;
-    const count = source.filter(ong => {
-      if (searchTerm && !ong.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
-          !ong.description.toLowerCase().includes(searchTerm.toLowerCase()) &&
-          !ong.category.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return false;
-      }
-      if (selectedRegion && ong.region !== selectedRegion) return false;
-      if (selectedNeighborhood && !ong.neighborhood.toLowerCase().includes(selectedNeighborhood.toLowerCase())) return false;
-      if (selectedCategory && ong.category !== selectedCategory) return false;
-      if (selectedLanguage && !ong.languages.includes(selectedLanguage)) return false;
-      if (selectedHours) {
-        const hours = ong.hours.toLowerCase();
-        if (selectedHours === 'Manhã (6h-12h)') {
-          if (!hours.includes('6h') && !hours.includes('7h') && !hours.includes('8h') && 
-              !hours.includes('9h') && !hours.includes('10h')) return false;
-        } else if (selectedHours === 'Tarde (12h-18h)') {
-          if (!hours.includes('12h') && !hours.includes('13h') && !hours.includes('14h') && 
-              !hours.includes('15h') && !hours.includes('16h') && !hours.includes('17h')) return false;
-        } else if (selectedHours === 'Noite (18h-22h)') {
-          if (!hours.includes('18h') && !hours.includes('19h') && !hours.includes('20h') && !hours.includes('21h')) return false;
-        }
+        const periods = ong.hourPeriods && ong.hourPeriods.length
+          ? ong.hourPeriods
+          : normalizeHourPeriods(ong.hours);
+        if (!periods.includes(selectedHours)) return false;
       }
       if (accessibilityFilter === 'accessibility' && !ong.hasAccessibility) return false;
       if (accessibilityFilter === 'remote' && !ong.hasRemoteService) return false;
@@ -1882,9 +1816,9 @@ export function SearchPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
               >
                 <option value="">Todos os horários</option>
-                <option value="Manhã (6h-12h)">Manhã (6h-12h)</option>
-                <option value="Tarde (12h-18h)">Tarde (12h-18h)</option>
-                <option value="Noite (18h-22h)">Noite (18h-22h)</option>
+                <option value="manha">Manhã</option>
+                <option value="tarde">Tarde</option>
+                <option value="noite">Noite</option>
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
