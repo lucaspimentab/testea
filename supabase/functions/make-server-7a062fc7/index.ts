@@ -660,13 +660,13 @@ app.delete("/make-server-7a062fc7/vagas/:id", async (c)=>{
   }
 });
 // ==================== PERGUNTAS ROUTES ====================
-// List all perguntas with optional ONG filter
+// List all perguntas with optional ONG filter (público recebe apenas respondidas)
 app.get("/make-server-7a062fc7/perguntas", async (c)=>{
-  const authResult = await verifyAuth(c.req.header('Authorization'));
-  if (authResult.error) {
-    return c.json({
-      error: authResult.error
-    }, 401);
+  const authHeader = c.req.header('Authorization');
+  const isPublic = !authHeader;
+  const authResult = authHeader ? await verifyAuth(authHeader) : { error: null, user: null };
+  if (authHeader && authResult.error) {
+    return c.json({ error: authResult.error }, 401);
   }
   try {
     const ongId = c.req.query('ongId');
@@ -675,14 +675,20 @@ app.get("/make-server-7a062fc7/perguntas", async (c)=>{
     if (ongId) {
       filtered = filtered.filter((pergunta)=>pergunta.ongId === ongId);
     }
-    return c.json({
-      perguntas: filtered
-    });
+    // Remover duplicadas (mesma mensagem+email), mantendo a mais recente
+    filtered = filtered
+      .sort((a, b)=>new Date(b.criadoEm || 0).getTime() - new Date(a.criadoEm || 0).getTime())
+      .filter((p, idx, arr)=>{
+        const key = `${(p.email || '').toLowerCase()}|${(p.mensagem || '').toLowerCase()}`;
+        return arr.findIndex((x)=>`${(x.email || '').toLowerCase()}|${(x.mensagem || '').toLowerCase()}` === key) === idx;
+      });
+    if (isPublic) {
+      filtered = filtered.filter((pergunta)=>pergunta.respondida);
+    }
+    return c.json({ perguntas: filtered });
   } catch (error) {
     console.error('Error fetching perguntas:', error);
-    return c.json({
-      error: 'Error fetching perguntas'
-    }, 500);
+    return c.json({ error: 'Error fetching perguntas' }, 500);
   }
 });
 // Create new pergunta (public)
@@ -693,6 +699,8 @@ app.post("/make-server-7a062fc7/perguntas", async (c)=>{
     const pergunta = {
       id,
       ...body,
+      nome: body.nome || body.nomeUsuario || 'Visitante',
+      email: body.email || 'visitante@example.com',
       respondida: body.respondida ?? false,
       resposta: body.resposta ?? null,
       criadoEm: new Date().toISOString()

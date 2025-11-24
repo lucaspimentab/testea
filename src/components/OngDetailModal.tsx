@@ -22,6 +22,7 @@ interface OngDetailModalProps {
 
 export function OngDetailModal({ ong, onClose }: OngDetailModalProps) {
   const [question, setQuestion] = useState('');
+  const [questionName, setQuestionName] = useState('');
   const [perguntasRespondidas, setPerguntasRespondidas] = useState<any[]>([]);
   const [vagas, setVagas] = useState<any[]>([]);
   const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-7a062fc7`;
@@ -30,12 +31,15 @@ export function OngDetailModal({ ong, onClose }: OngDetailModalProps) {
     const loadExtras = async () => {
       try {
         const [pergResp, vagasResp] = await Promise.all([
-          fetch(`${API_BASE_URL}/perguntas?ongId=${ong.id}`, {
-            headers: { 'Authorization': `Bearer ${publicAnonKey}` }
-          }).then(r => r.ok ? r.json() : { perguntas: [] }).catch(() => ({ perguntas: [] })),
-          fetch(`${API_BASE_URL}/vagas?ongId=${ong.id}`).then(r => r.ok ? r.json() : { vagas: [] }).catch(() => ({ vagas: [] })),
+          fetch(`${API_BASE_URL}/perguntas?ongId=${ong.id}`)
+            .then((r) => (r.ok ? r.json() : { perguntas: [] }))
+            .catch(() => ({ perguntas: [] })),
+          fetch(`${API_BASE_URL}/vagas?ongId=${ong.id}`)
+            .then((r) => (r.ok ? r.json() : { vagas: [] }))
+            .catch(() => ({ vagas: [] })),
         ]);
-        setPerguntasRespondidas(pergResp.perguntas || []);
+        const responded = (pergResp.perguntas || []).filter((p: any) => p.respondida);
+        setPerguntasRespondidas(responded);
         setVagas(vagasResp.vagas || []);
       } catch (err) {
         console.error('Erro ao carregar perguntas/vagas', err);
@@ -46,16 +50,33 @@ export function OngDetailModal({ ong, onClose }: OngDetailModalProps) {
     loadExtras();
   }, [ong.id]);
 
-  const handleSendQuestion = () => {
+  const handleSendQuestion = async () => {
     if (!question.trim()) {
       toast.error('Por favor, digite sua pergunta antes de enviar.');
       return;
     }
-    toast.success('Pergunta enviada com sucesso! A ONG responderá em breve.');
-    setQuestion('');
-    setTimeout(() => {
-      onClose();
-    }, 1500);
+    try {
+      const body = {
+        ongId: ong.id,
+        mensagem: question,
+        nome: questionName.trim() || 'Visitante',
+      };
+      const resp = await fetch(`${API_BASE_URL}/perguntas`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${publicAnonKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) throw new Error('Erro ao enviar pergunta');
+      toast.success('Pergunta enviada com sucesso! A ONG responderá em breve.');
+      setQuestion('');
+      setQuestionName('');
+    } catch (err) {
+      console.error(err);
+      toast.error('Não foi possível enviar sua pergunta. Tente novamente.');
+    }
   };
 
   return (
@@ -161,9 +182,21 @@ export function OngDetailModal({ ong, onClose }: OngDetailModalProps) {
                     <p className="text-gray-900 font-medium mb-1">{vaga.titulo || 'Vaga'}</p>
                     <p className="text-gray-700 text-sm mb-2">{vaga.descricao || 'Descrição não informada.'}</p>
                     <div className="text-xs text-gray-600 space-y-1">
-                      {vaga.horario && <p><span className="font-semibold">Horário:</span> {vaga.horario}</p>}
-                      {vaga.duracao && <p><span className="font-semibold">Duração:</span> {vaga.duracao}</p>}
-                      {vaga.requisitos && <p><span className="font-semibold">Requisitos:</span> {vaga.requisitos}</p>}
+                      {vaga.horario && (
+                        <p>
+                          <span className="font-semibold">Horário:</span> {vaga.horario}
+                        </p>
+                      )}
+                      {vaga.duracao && (
+                        <p>
+                          <span className="font-semibold">Duração:</span> {vaga.duracao}
+                        </p>
+                      )}
+                      {vaga.requisitos && (
+                        <p>
+                          <span className="font-semibold">Requisitos:</span> {vaga.requisitos}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -206,6 +239,12 @@ export function OngDetailModal({ ong, onClose }: OngDetailModalProps) {
           {/* Perguntas Frequentes */}
           <div>
             <h3 className="text-gray-900 mb-3">Faça uma Pergunta</h3>
+            <input
+              value={questionName}
+              onChange={(e) => setQuestionName(e.target.value)}
+              placeholder="Seu nome (opcional)"
+              className="w-full px-4 py-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            />
             <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}

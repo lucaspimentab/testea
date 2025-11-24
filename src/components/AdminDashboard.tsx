@@ -325,10 +325,14 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         throw new Error(error.error || 'Erro ao enviar resposta');
       }
 
+      const { pergunta } = await response.json().catch(() => ({ pergunta: null }));
+
       // Remover pergunta da lista
       const pendentesAtualizadas = perguntasPendentes.filter(p => p.id !== perguntaId);
       const respondida = perguntasPendentes.find(p => p.id === perguntaId);
-      const novaRespondida = respondida ? { ...respondida, resposta: data.pergunta.resposta, respondida: true } : data.pergunta;
+      const novaRespondida = respondida
+        ? { ...respondida, resposta, respondida: true }
+        : { ...(pergunta || {}), id: perguntaId, resposta, respondida: true };
       setPerguntasPendentes(pendentesAtualizadas);
       setPerguntasRespondidas([novaRespondida, ...perguntasRespondidas]);
       

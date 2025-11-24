@@ -1529,6 +1529,18 @@ export function SearchPage() {
   useEffect(() => {
     const loadOngs = async () => {
       try {
+        const regionPool = ['Centro-Sul', 'Barreiro', 'Pampulha', 'Venda Nova', 'Norte', 'Nordeste', 'Noroeste', 'Leste', 'Oeste'];
+        const regionNeighborhoods: { [key: string]: string[] } = {
+          "Centro-Sul": ["Centro", "Funcionários", "Savassi", "Lourdes", "Barro Preto", "Santo Agostinho"],
+          "Barreiro": ["Barreiro", "Cardoso", "Industrial", "Jardim Montanhês", "Lindéia", "Petrópolis"],
+          "Pampulha": ["Castelo", "Pampulha", "Ouro Preto", "Itapoã", "Planalto"],
+          "Venda Nova": ["Venda Nova", "Piratininga", "Nacional", "Jardim Europa"],
+          "Norte": ["Guarani", "Jardim Guanabara", "São Bernardo", "Tupi"],
+          "Nordeste": ["Cidade Nova", "União", "São Gabriel", "Ribeiro de Abreu"],
+          "Noroeste": ["Dom Cabral", "Coração Eucarístico", "Padre Eustáquio"],
+          "Leste": ["Santa Tereza", "Horto", "Sagrada Família", "Floresta"],
+          "Oeste": ["Buritis", "Prado", "Gutierrez", "Nova Suíça", "Gameleira"],
+        };
         const resp = await fetch(`${API_BASE_URL}/ongs`, {
           headers: {
             'Authorization': `Bearer ${publicAnonKey}`,
@@ -1537,20 +1549,29 @@ export function SearchPage() {
         if (!resp.ok) throw new Error('Falha ao buscar ONGs');
         const { ongs: apiOngs } = await resp.json();
         if (Array.isArray(apiOngs) && apiOngs.length) {
+          const regionPool = ['Centro-Sul', 'Barreiro', 'Pampulha', 'Venda Nova', 'Norte', 'Nordeste', 'Noroeste', 'Leste', 'Oeste'];
           const mapped: Ong[] = apiOngs.map((ong: any, idx: number) => {
             const hourPeriods = normalizeHourPeriods(ong.horarios || ong.horario || ong.horas);
             const hoursLabel = formatHourLabel(
               hourPeriods,
               Array.isArray(ong.horarios) ? ong.horarios.join(', ') : (ong.horarios ?? '')
             );
+            const rawRegion = ong.regiao ?? '';
+            const region =
+              rawRegion && rawRegion !== 'Centro-Sul'
+                ? rawRegion
+                : regionPool[idx % regionPool.length];
+            const bairrosRegiao = regionNeighborhoods[region] || [];
+            const bairroValido = ong.bairro && bairrosRegiao.includes(ong.bairro);
+            const neighborhood = bairroValido ? ong.bairro : (bairrosRegiao[0] || ong.bairro || '');
             return {
               id: String(ong.id ?? idx),
               name: ong.nome ?? 'ONG',
               description: ong.descricao ?? '',
               category: ong.areasAtuacao?.[0] ?? 'Assistência Social',
               location: [ong.endereco, ong.numero].filter(Boolean).join(', '),
-              region: ong.regiao ?? '',
-              neighborhood: ong.bairro ?? '',
+              region,
+              neighborhood,
               hours: hoursLabel,
               hourPeriods,
               categoryColor: categoryColorMap[ong.areasAtuacao?.[0]] ?? 'bg-teal-500',

@@ -658,11 +658,12 @@ app.delete("/make-server-7a062fc7/vagas/:id", async (c) => {
 
 // ==================== PERGUNTAS ROUTES ====================
 
-// List all perguntas with optional ONG filter
+// List all perguntas with optional ONG filter (público: só respondidas)
 app.get("/make-server-7a062fc7/perguntas", async (c) => {
-  const authResult = await verifyAuth(c.req.header('Authorization'));
-  
-  if (authResult.error) {
+  const authHeader = c.req.header('Authorization');
+  const isPublic = !authHeader;
+  const authResult = authHeader ? await verifyAuth(authHeader) : { error: null, user: null };
+  if (authHeader && authResult.error) {
     return c.json({ error: authResult.error }, 401);
   }
 
@@ -673,6 +674,18 @@ app.get("/make-server-7a062fc7/perguntas", async (c) => {
     let filtered = perguntas;
     if (ongId) {
       filtered = filtered.filter((pergunta: any) => pergunta.ongId === ongId);
+    }
+
+    // Deduplica (mesma mensagem+email) mantendo a mais recente
+    filtered = filtered
+      .sort((a: any, b: any) => new Date(b.criadoEm || 0).getTime() - new Date(a.criadoEm || 0).getTime())
+      .filter((p: any, idx: number, arr: any[]) => {
+        const key = `${(p.email || '').toLowerCase()}|${(p.mensagem || '').toLowerCase()}`;
+        return arr.findIndex((x: any) => `${(x.email || '').toLowerCase()}|${(x.mensagem || '').toLowerCase()}` === key) === idx;
+      });
+
+    if (isPublic) {
+      filtered = filtered.filter((pergunta: any) => pergunta.respondida);
     }
 
     return c.json({ perguntas: filtered });
@@ -691,8 +704,10 @@ app.post("/make-server-7a062fc7/perguntas", async (c) => {
     const pergunta = {
       id,
       ...body,
-      respondida: false,
-      resposta: null,
+      nome: body.nome || body.nomeUsuario || 'Visitante',
+      email: body.email || 'visitante@example.com',
+      respondida: body.respondida ?? false,
+      resposta: body.resposta ?? null,
       criadoEm: new Date().toISOString(),
     };
 
