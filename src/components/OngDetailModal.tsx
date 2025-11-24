@@ -1,9 +1,10 @@
-import { MapPin, Clock, Users, Heart, ArrowLeft } from 'lucide-react';
+import { MapPin, Clock, Users, Heart, ArrowLeft, Briefcase, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 interface Ong {
-  id: number;
+  id: string | number;
   name: string;
   description: string;
   category: string;
@@ -21,6 +22,29 @@ interface OngDetailModalProps {
 
 export function OngDetailModal({ ong, onClose }: OngDetailModalProps) {
   const [question, setQuestion] = useState('');
+  const [perguntasRespondidas, setPerguntasRespondidas] = useState<any[]>([]);
+  const [vagas, setVagas] = useState<any[]>([]);
+  const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-7a062fc7`;
+
+  useEffect(() => {
+    const loadExtras = async () => {
+      try {
+        const [pergResp, vagasResp] = await Promise.all([
+          fetch(`${API_BASE_URL}/perguntas?ongId=${ong.id}`, {
+            headers: { 'Authorization': `Bearer ${publicAnonKey}` }
+          }).then(r => r.ok ? r.json() : { perguntas: [] }).catch(() => ({ perguntas: [] })),
+          fetch(`${API_BASE_URL}/vagas?ongId=${ong.id}`).then(r => r.ok ? r.json() : { vagas: [] }).catch(() => ({ vagas: [] })),
+        ]);
+        setPerguntasRespondidas(pergResp.perguntas || []);
+        setVagas(vagasResp.vagas || []);
+      } catch (err) {
+        console.error('Erro ao carregar perguntas/vagas', err);
+        setPerguntasRespondidas([]);
+        setVagas([]);
+      }
+    };
+    loadExtras();
+  }, [ong.id]);
 
   const handleSendQuestion = () => {
     if (!question.trim()) {
@@ -121,6 +145,62 @@ export function OngDetailModal({ ong, onClose }: OngDetailModalProps) {
                 <p className="text-gray-600 text-sm">Contribua financeiramente com nossos projetos</p>
               </div>
             </div>
+          </div>
+
+          {/* Vagas */}
+          <div>
+            <h3 className="text-gray-900 mb-3">Vagas de Voluntariado</h3>
+            {vagas.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {vagas.map((vaga) => (
+                  <div key={vaga.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-center gap-2 text-sm text-teal-700 mb-2">
+                      <Briefcase className="w-4 h-4" />
+                      <span>Ativa</span>
+                    </div>
+                    <p className="text-gray-900 font-medium mb-1">{vaga.titulo || 'Vaga'}</p>
+                    <p className="text-gray-700 text-sm mb-2">{vaga.descricao || 'Descrição não informada.'}</p>
+                    <div className="text-xs text-gray-600 space-y-1">
+                      {vaga.horario && <p><span className="font-semibold">Horário:</span> {vaga.horario}</p>}
+                      {vaga.duracao && <p><span className="font-semibold">Duração:</span> {vaga.duracao}</p>}
+                      {vaga.requisitos && <p><span className="font-semibold">Requisitos:</span> {vaga.requisitos}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">Nenhuma vaga publicada.</p>
+            )}
+          </div>
+
+          {/* Perguntas e respostas */}
+          <div>
+            <h3 className="text-gray-900 mb-3">Perguntas Respondidas</h3>
+            {perguntasRespondidas.length > 0 ? (
+              <div className="space-y-3">
+                {perguntasRespondidas.map((p) => (
+                  <div key={p.id} className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm text-gray-600 flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4" />
+                        <span>{p.nome || p.nomeUsuario || 'Usuário'}</span>
+                        <span>•</span>
+                        <span>{new Date(p.criadoEm).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                      <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full">Respondida</span>
+                    </div>
+                    <p className="text-gray-900 font-medium mb-1">{p.mensagem || p.pergunta}</p>
+                    {p.resposta && (
+                      <p className="text-gray-700 text-sm">
+                        <span className="font-semibold">Resposta:</span> {p.resposta}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">Nenhuma pergunta respondida ainda.</p>
+            )}
           </div>
 
           {/* Perguntas Frequentes */}

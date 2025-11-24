@@ -314,6 +314,18 @@ app.post("/make-server-7a062fc7/signup", async (c)=>{
       respondida: false,
       criadaEm: new Date().toISOString()
     });
+    const perguntaRespondidaId = crypto.randomUUID();
+    await kv.set(`perguntas:${perguntaRespondidaId}`, {
+      id: perguntaRespondidaId,
+      ongId,
+      nome: 'João Santos',
+      email: 'joao@example.com',
+      mensagem: 'Vocês oferecem atendimento remoto?',
+      resposta: 'Sim, fazemos triagem inicial por videochamada.',
+      respondida: true,
+      criadaEm: new Date().toISOString(),
+      respondidoEm: new Date().toISOString()
+    });
 
     return c.json({
       user: {
@@ -639,13 +651,15 @@ app.delete("/make-server-7a062fc7/vagas/:id", async (c)=>{
   }
 });
 // ==================== PERGUNTAS ROUTES ====================
-// List all perguntas with optional ONG filter
+// List all perguntas with optional ONG filter (public: devolve somente respondidas; admin/autenticado: todas)
 app.get("/make-server-7a062fc7/perguntas", async (c)=>{
-  const authResult = await verifyAuth(c.req.header('Authorization'));
-  if (authResult.error) {
-    return c.json({
-      error: authResult.error
-    }, 401);
+  let isAuthenticated = false;
+  const authHeader = c.req.header('Authorization');
+  if (authHeader) {
+    const authResult = await verifyAuth(authHeader);
+    if (!authResult.error) {
+      isAuthenticated = true;
+    }
   }
   try {
     const ongId = c.req.query('ongId');
@@ -654,6 +668,16 @@ app.get("/make-server-7a062fc7/perguntas", async (c)=>{
     if (ongId) {
       filtered = filtered.filter((pergunta)=>pergunta.ongId === ongId);
     }
+    if (!isAuthenticated) {
+      filtered = filtered.filter((pergunta)=>pergunta.respondida);
+    }
+    // Ordenar com pendentes primeiro e respondidas depois
+    filtered = filtered.sort((a, b)=>{
+      if (a.respondida === b.respondida) {
+        return new Date(b.criadoEm || b.createdAt || 0).getTime() - new Date(a.criadoEm || a.createdAt || 0).getTime();
+      }
+      return a.respondida ? 1 : -1;
+    });
     return c.json({
       perguntas: filtered
     });

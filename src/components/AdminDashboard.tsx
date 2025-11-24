@@ -21,7 +21,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [userEmail, setUserEmail] = useState('');
   const [ongData, setOngData] = useState<any>(null);
   const [metricsData, setMetricsData] = useState<any>(null);
-  const [perguntas, setPerguntas] = useState<any[]>([]);
+  const [perguntasPendentes, setPerguntasPendentes] = useState<any[]>([]);
+  const [perguntasRespondidas, setPerguntasRespondidas] = useState<any[]>([]);
   const [vagas, setVagas] = useState<any[]>([]);
 
   const [updateFormData, setUpdateFormData] = useState({
@@ -184,7 +185,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
       if (response.ok) {
         const { perguntas } = await response.json();
-        setPerguntas(perguntas || []);
+        const pendentes = (perguntas || []).filter((p: any) => !p.respondida);
+        const respondidas = (perguntas || []).filter((p: any) => p.respondida);
+        setPerguntasPendentes(pendentes);
+        setPerguntasRespondidas(respondidas);
       }
     } catch (error) {
       console.error('Erro ao carregar perguntas:', error);
@@ -324,7 +328,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       }
 
       // Remover pergunta da lista
-      setPerguntas(perguntas.filter(p => p.id !== perguntaId));
+      const pendentesAtualizadas = perguntasPendentes.filter(p => p.id !== perguntaId);
+      const respondida = perguntasPendentes.find(p => p.id === perguntaId);
+      const novaRespondida = respondida ? { ...respondida, resposta: data.pergunta.resposta, respondida: true } : data.pergunta;
+      setPerguntasPendentes(pendentesAtualizadas);
+      setPerguntasRespondidas([novaRespondida, ...perguntasRespondidas]);
       
       toast.success('✅ Resposta enviada com sucesso!');
     } catch (error: any) {
@@ -930,60 +938,87 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           )}
 
           {activeTab === 'responder' && (
-            <div>
-              <h3 className="text-gray-900 mb-2">Perguntas dos Usuários</h3>
-              <p className="text-gray-600 text-sm mb-6">
-                Responda as dúvidas dos interessados em sua ONG
-              </p>
-
-              {perguntas.length > 0 ? (
-                <div className="space-y-4">
-                  {perguntas.map((pergunta) => (
-                    <div key={pergunta.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                      <div className="mb-4">
-                        <p className="text-gray-900 mb-2">
-                          {pergunta.pergunta}
-                        </p>
-                        <div className="flex items-center gap-3 text-sm text-gray-500">
-                          <span>{pergunta.nomeUsuario || 'Usuário'}</span>
-                          <span>•</span>
-                          <span>{new Date(pergunta.criadoEm).toLocaleDateString('pt-BR')}</span>
+            <div className="space-y-10">
+              <div>
+                <h3 className="text-gray-900 mb-2">Perguntas pendentes</h3>
+                <p className="text-gray-600 text-sm mb-6">
+                  Responda as dúvidas dos interessados em sua ONG
+                </p>
+                {perguntasPendentes.length > 0 ? (
+                  <div className="space-y-4">
+                    {perguntasPendentes.map((pergunta) => (
+                      <div key={pergunta.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                        <div className="mb-4">
+                          <p className="text-gray-900 mb-2">
+                            {pergunta.mensagem || pergunta.pergunta}
+                          </p>
+                          <div className="flex items-center gap-3 text-sm text-gray-500">
+                            <span>{pergunta.nome || pergunta.nomeUsuario || 'Usuário'}</span>
+                            <span>•</span>
+                            <span>{new Date(pergunta.criadoEm).toLocaleDateString('pt-BR')}</span>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="mb-4">
-                        <label className="block text-gray-700 mb-2 text-sm">Sua Resposta</label>
-                        <textarea
-                          placeholder="Digite uma resposta clara e objetiva..."
-                          rows={3}
-                          value={pergunta.resposta || ''}
-                          onChange={(e) => {
-                            const updated = perguntas.map(p => 
-                              p.id === pergunta.id ? { ...p, resposta: e.target.value } : p
-                            );
-                            setPerguntas(updated);
-                          }}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
-                        />
-                      </div>
+                        <div className="mb-4">
+                          <label className="block text-gray-700 mb-2 text-sm">Sua Resposta</label>
+                          <textarea
+                            placeholder="Digite uma resposta clara e objetiva..."
+                            rows={3}
+                            value={pergunta.resposta || ''}
+                            onChange={(e) => {
+                              const updated = perguntasPendentes.map(p => 
+                                p.id === pergunta.id ? { ...p, resposta: e.target.value } : p
+                              );
+                              setPerguntasPendentes(updated);
+                            }}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+                          />
+                        </div>
 
-                      <button 
-                        onClick={() => handleAnswerSubmit(pergunta.id, pergunta.resposta || '')}
-                        className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2"
-                      >
-                        <Check className="w-4 h-4" />
-                        Enviar Resposta
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-12 text-center">
-                  <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-2">Nenhuma pergunta pendente</p>
-                  <p className="text-gray-500 text-sm">As novas perguntas dos usuários aparecerão aqui.</p>
-                </div>
-              )}
+                        <button 
+                          onClick={() => handleAnswerSubmit(pergunta.id, pergunta.resposta || '')}
+                          className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2"
+                        >
+                          <Check className="w-4 h-4" />
+                          Enviar Resposta
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-12 text-center">
+                    <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 mb-2">Nenhuma pergunta pendente</p>
+                    <p className="text-gray-500 text-sm">As novas perguntas dos usuários aparecerão aqui.</p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-gray-900 mb-2">Perguntas respondidas</h3>
+                {perguntasRespondidas.length > 0 ? (
+                  <div className="space-y-3">
+                    {perguntasRespondidas.map((pergunta) => (
+                      <div key={pergunta.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-sm text-gray-600 flex items-center gap-2">
+                            <span>{pergunta.nome || pergunta.nomeUsuario || 'Usuário'}</span>
+                            <span>•</span>
+                            <span>{new Date(pergunta.criadoEm).toLocaleDateString('pt-BR')}</span>
+                          </div>
+                          <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full">Respondida</span>
+                        </div>
+                        <p className="text-gray-900 mb-2 font-medium">{pergunta.mensagem || pergunta.pergunta}</p>
+                        <p className="text-gray-700 text-sm">
+                          <span className="font-semibold">Resposta:</span> {pergunta.resposta}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">Nenhuma pergunta respondida ainda.</p>
+                )}
+              </div>
             </div>
           )}
         </div>
