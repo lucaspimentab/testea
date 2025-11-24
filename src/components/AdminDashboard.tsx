@@ -234,8 +234,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       console.log('✅ ONG updated:', ong);
       setOngData(ong);
       
-      toast.success('✅ Dados da ONG atualizados com sucesso!');
-      setActiveTab('metricas');
+      toast.success('✅ Dados da ONG atualizados com sucesso!', { duration: 5000 });
     } catch (error: any) {
       console.error('❌ Error updating ONG:', error);
       toast.error(`❌ Erro: ${error.message}`);
@@ -294,8 +293,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         duracao: ''
       });
       
-      toast.success('✅ Vaga publicada com sucesso!');
-      setActiveTab('metricas');
+      toast.success('✅ Vaga publicada com sucesso!', { duration: 5000 });
     } catch (error: any) {
       console.error('❌ Error publishing vaga:', error);
       toast.error(`❌ Erro ao publicar vaga: ${error.message}`);

@@ -142,15 +142,21 @@ app.post("/make-server-7a062fc7/debug/recreate-admin", async (c)=>{
         error: 'No ONGs found. Please seed database first by clicking "📊 Criar Métricas e Dados".'
       }, 400);
     }
-    const firstOng = allOngs[0];
-    console.log('🏢 First ONG found:', firstOng.nome, '- ID:', firstOng.id);
+    // Preferir ONG custom (id/nome) para a conta admin
+    const normalize = (v: string)=>v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const preferredOng = allOngs.find((ong)=>ong.id === '6e855537-4a3d-414f-91f7-4a3577c705a1') || 
+      allOngs.find((ong)=>normalize(String(ong.email || '')).includes('lucaspimentabraga2')) ||
+      allOngs.find((ong)=>normalize(String(ong.endereco || '')).includes('rua ingas')) ||
+      allOngs.find((ong)=>normalize(String(ong.nome || '')).includes('acao solidaria')) || 
+      allOngs[0];
+    console.log('🏢 ONG selecionada para admin:', preferredOng.nome, '- ID:', preferredOng.id);
     // Create admin user with ONG link
     const adminUser = {
       email: 'admin@ong.com',
       password: 'admin1234',
       name: 'Administrador',
       role: 'admin',
-      ongId: firstOng.id,
+      ongId: preferredOng.id,
       createdAt: new Date().toISOString()
     };
     await kv.set('user:admin@ong.com', adminUser);
@@ -180,6 +186,49 @@ app.post("/make-server-7a062fc7/debug/recreate-admin", async (c)=>{
     return c.json({
       error: 'Error recreating admin: ' + error.message
     }, 500);
+  }
+});
+
+// Force set admin user to a specific ONG ID (debug)
+app.post("/make-server-7a062fc7/debug/set-admin-ong", async (c)=>{
+  try {
+    const body = await c.req.json();
+    const ongId = body?.ongId;
+    if (!ongId) {
+      return c.json({ error: 'ongId is required' }, 400);
+    }
+    const ong = await kv.get(`ongs:${ongId}`);
+    if (!ong) {
+      return c.json({ error: 'ONG not found' }, 404);
+    }
+    const existingUser = await kv.get('user:admin@ong.com');
+    const adminUser = {
+      email: 'admin@ong.com',
+      password: 'admin1234',
+      name: 'Administrador',
+      role: 'admin',
+      ongId,
+      createdAt: existingUser?.createdAt || new Date().toISOString()
+    };
+    await kv.set('user:admin@ong.com', adminUser);
+    return c.json({
+      success: true,
+      adminUser: {
+        email: adminUser.email,
+        name: adminUser.name,
+        role: adminUser.role,
+        ongId: adminUser.ongId
+      },
+      linkedOng: {
+        id: ong.id,
+        nome: ong.nome,
+        email: ong.email,
+        telefone: ong.telefone
+      }
+    });
+  } catch (error: any) {
+    console.error('Erro no set-admin-ong:', error);
+    return c.json({ error: error.message }, 500);
   }
 });
 // ==================== AUTH ROUTES ====================
@@ -644,8 +693,8 @@ app.post("/make-server-7a062fc7/perguntas", async (c)=>{
     const pergunta = {
       id,
       ...body,
-      respondida: false,
-      resposta: null,
+      respondida: body.respondida ?? false,
+      resposta: body.resposta ?? null,
       criadoEm: new Date().toISOString()
     };
     await kv.set(`perguntas:${id}`, pergunta);

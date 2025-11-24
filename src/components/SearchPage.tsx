@@ -1517,6 +1517,13 @@ export function SearchPage() {
   const [showBigMessage, setShowBigMessage] = useState(false);
   const [bigMessageText, setBigMessageText] = useState('');
   const [bigMessageType, setBigMessageType] = useState<'success' | 'info'>('success');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
+  const [appliedRegion, setAppliedRegion] = useState('');
+  const [appliedNeighborhood, setAppliedNeighborhood] = useState('');
+  const [appliedCategory, setAppliedCategory] = useState('');
+  const [appliedLanguage, setAppliedLanguage] = useState('');
+  const [appliedHours, setAppliedHours] = useState<HourPeriod | ''>('');
+  const [appliedAccessibility, setAppliedAccessibility] = useState<'all' | 'accessibility' | 'remote'>('all');
   const itemsPerPage = 12;
 
   useEffect(() => {
@@ -1596,65 +1603,114 @@ export function SearchPage() {
     setSelectedNeighborhood(''); // Limpa o bairro ao mudar de região
   };
 
-  const filterOngs = () => {
-    const source = ongs;
-    // Se não tiver buscado ainda, mostrar todas as ONGs
-    if (!hasSearched) {
-      return source;
-    }
+  const applyFilters = (filters: {
+    hasSearched: boolean;
+    searchTerm: string;
+    region: string;
+    neighborhood: string;
+    category: string;
+    language: string;
+    hours: HourPeriod | '';
+    accessibility: 'all' | 'accessibility' | 'remote';
+  }) => {
+    if (!filters.hasSearched) return ongs;
 
-    return source.filter(ong => {
-      // Filtro de palavra-chave
-      if (searchTerm && !ong.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
-          !ong.description.toLowerCase().includes(searchTerm.toLowerCase()) &&
-          !ong.category.toLowerCase().includes(searchTerm.toLowerCase())) {
+    return ongs.filter((ong) => {
+      if (filters.searchTerm && !ong.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) &&
+          !ong.description.toLowerCase().includes(filters.searchTerm.toLowerCase()) &&
+          !ong.category.toLowerCase().includes(filters.searchTerm.toLowerCase())) {
         return false;
       }
-
-      // Filtro de região
-      if (selectedRegion && ong.region !== selectedRegion) {
-        return false;
+      if (filters.region && ong.region !== filters.region) return false;
+      if (filters.neighborhood && !ong.neighborhood.toLowerCase().includes(filters.neighborhood.toLowerCase())) return false;
+      if (filters.category && ong.category !== filters.category) return false;
+      if (filters.language && !ong.languages.includes(filters.language)) return false;
+      if (filters.hours) {
+        const periods = ong.hourPeriods && ong.hourPeriods.length ? ong.hourPeriods : normalizeHourPeriods(ong.hours);
+        if (!periods.includes(filters.hours)) return false;
       }
-
-      // Filtro de bairro
-      if (selectedNeighborhood && !ong.neighborhood.toLowerCase().includes(selectedNeighborhood.toLowerCase())) {
-        return false;
-      }
-
-      // Filtro de categoria
-      if (selectedCategory && ong.category !== selectedCategory) {
-        return false;
-      }
-
-      // Filtro de idioma
-      if (selectedLanguage && !ong.languages.includes(selectedLanguage)) {
-        return false;
-      }
-
-      // Filtro de horário
-      if (selectedHours) {
-        const periods = ong.hourPeriods && ong.hourPeriods.length
-          ? ong.hourPeriods
-          : normalizeHourPeriods(ong.hours);
-        if (!periods.includes(selectedHours)) return false;
-      }
-      if (accessibilityFilter === 'accessibility' && !ong.hasAccessibility) return false;
-      if (accessibilityFilter === 'remote' && !ong.hasRemoteService) return false;
+      if (filters.accessibility === 'accessibility' && !ong.hasAccessibility) return false;
+      if (filters.accessibility === 'remote' && !ong.hasRemoteService) return false;
       return true;
-    }).length;
-    
-    // Mostrar mensagem grande
+    });
+  };
+
+  const handleSearch = () => {
+    const nextFilters = {
+      hasSearched: true,
+      searchTerm,
+      region: selectedRegion,
+      neighborhood: selectedNeighborhood,
+      category: selectedCategory,
+      language: selectedLanguage,
+      hours: selectedHours,
+      accessibility: accessibilityFilter,
+    };
+
+    setAppliedSearchTerm(searchTerm);
+    setAppliedRegion(selectedRegion);
+    setAppliedNeighborhood(selectedNeighborhood);
+    setAppliedCategory(selectedCategory);
+    setAppliedLanguage(selectedLanguage);
+    setAppliedHours(selectedHours);
+    setAppliedAccessibility(accessibilityFilter);
+    setHasSearched(true);
+    setCurrentPage(1);
+
+    const filtered = applyFilters(nextFilters);
+    const count = filtered.length;
+
     setBigMessageType('success');
     setBigMessageText(`✨ Filtros aplicados com sucesso! ${count} ${count === 1 ? 'ONG encontrada' : 'ONGs encontradas'}!`);
     setShowBigMessage(true);
-    
-    // Esconder após 3 segundos
-    setTimeout(() => {
-      setShowBigMessage(false);
-    }, 3000);
-    
+
+    setTimeout(() => setShowBigMessage(false), 4000);
     toast.success(`${count} ${count === 1 ? 'ONG encontrada' : 'ONGs encontradas'}!`);
   };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setSelectedRegion('');
+    setSelectedNeighborhood('');
+    setSelectedCategory('');
+    setSelectedLanguage('');
+    setSelectedHours('');
+    setAccessibilityFilter('all');
+
+    setAppliedSearchTerm('');
+    setAppliedRegion('');
+    setAppliedNeighborhood('');
+    setAppliedCategory('');
+    setAppliedLanguage('');
+    setAppliedHours('');
+    setAppliedAccessibility('all');
+    setHasSearched(false);
+    setCurrentPage(1);
+  };
+
+  const filteredOngs = applyFilters({
+    hasSearched,
+    searchTerm: appliedSearchTerm,
+    region: appliedRegion,
+    neighborhood: appliedNeighborhood,
+    category: appliedCategory,
+    language: appliedLanguage,
+    hours: appliedHours,
+    accessibility: appliedAccessibility,
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredOngs.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentOngs = filteredOngs.slice(startIndex, startIndex + itemsPerPage);
+  const hasActiveFilters = Boolean(
+    appliedSearchTerm ||
+    appliedRegion ||
+    appliedNeighborhood ||
+    appliedCategory ||
+    appliedLanguage ||
+    appliedHours ||
+    appliedAccessibility !== 'all'
+  );
 
   const goToPage = (page: number) => {
     setCurrentPage(page);
