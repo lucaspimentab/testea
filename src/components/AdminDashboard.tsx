@@ -622,7 +622,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <div>
               <h3 className="text-gray-900 mb-2">Atualizar Dados da ONG</h3>
               <p className="text-gray-600 text-sm mb-6">
-                Mantenha as informações da sua organização sempre atualizadas
+                Mantenha as informações da sua organização sempre atualizadas. Ao salvar você permanece nesta aba e vê a confirmação no topo.
               </p>
 
               <form className="space-y-6" onSubmit={handleUpdateSubmit}>
@@ -823,7 +823,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <div>
               <h3 className="text-gray-900 mb-2">Publicar Vaga de Voluntariado</h3>
               <p className="text-gray-600 text-sm mb-6">
-                Atraia voluntários para ajudar sua causa
+                Atraia voluntários para ajudar sua causa. Depois de publicar, você permanece aqui e pode cadastrar outra vaga na sequência.
               </p>
 
               {/* Vagas Publicadas */}
