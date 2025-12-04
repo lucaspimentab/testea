@@ -1765,27 +1765,13 @@ export function SearchPage() {
           </label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <select
+            <input
+              type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg appearance-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
-            >
-              <option value="">Selecione uma palavra-chave</option>
-              <option value="educação">Educação</option>
-              <option value="saúde">Saúde</option>
-              <option value="meio ambiente">Meio Ambiente</option>
-              <option value="assistência social">Assistência Social</option>
-              <option value="animais">Animais</option>
-              <option value="cultura">Cultura</option>
-              <option value="esportes">Esportes</option>
-              <option value="alimentação">Alimentação</option>
-              <option value="idosos">Idosos</option>
-              <option value="crianças">Crianças</option>
-              <option value="adolescentes">Adolescentes</option>
-              <option value="voluntariado">Voluntariado</option>
-              <option value="outros">Outros</option>
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              placeholder="Digite o que procura (ex.: educação, saúde, voluntariado)"
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white"
+            />
           </div>
         </div>
 
